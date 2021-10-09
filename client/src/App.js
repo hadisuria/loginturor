@@ -9,7 +9,7 @@ function App() {
 	const [username, setUsername] = useState("");
 	const [password, setPassword] = useState("");
 
-	const [loginStatus, setLoginStatus] = useState("");
+	const [loginStatus, setLoginStatus] = useState(false);
 
 	const resetRegistrationInput = () => {
 		setUsernameReg("");
@@ -37,11 +37,12 @@ function App() {
 			username: username,
 			password: password,
 		}).then((response) => {
-			console.log(response.data);
-			if (response?.data?.message) {
-				setLoginStatus(response.data.message);
+			// console.log(response.data);
+			if (!response.data.auth) {
+				setLoginStatus(false);
 			} else {
-				setLoginStatus(`Logged in username: ${response.data[0].username}`);
+				setLoginStatus(true);
+				localStorage.setItem("token", response.data.token);
 			}
 			resetLoginInput();
 		});
@@ -50,10 +51,20 @@ function App() {
 	useEffect(() => {
 		Axios.get("http://localhost:3001/login").then((response) => {
 			if (response.data.loggedIn) {
-				setLoginStatus(`Logged in username: ${response.data.user[0].username}`);
+				setLoginStatus(true);
 			}
 		});
 	}, []);
+
+	const userAuthenticated = () => {
+		Axios.get("http://localhost:3001/isUserAuth", {
+			headers: {
+				"x-access-token": localStorage.getItem("token"),
+			},
+		}).then((response) => {
+			console.log(response);
+		});
+	};
 
 	return (
 		<div className="App">
@@ -94,7 +105,9 @@ function App() {
 				<button onClick={login}>Login</button>
 			</div>
 
-			<h1>{loginStatus}</h1>
+			{loginStatus && (
+				<button onClick={userAuthenticated}>Check if Authenticated</button>
+			)}
 		</div>
 	);
 }

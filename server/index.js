@@ -9,6 +9,8 @@ const session = require("express-session");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 
+const jwt = require("jsonwebtoken");
+
 const app = express();
 
 const db = mysql.createPool({
@@ -68,6 +70,27 @@ app.post("/register", (req, res) => {
 	});
 });
 
+const verifyJWT = (req, res, next) => {
+	const token = req.headers["x-access-token"];
+
+	if (!token) {
+		res.send("Yo, we need a token, please give it to use next time!");
+	} else {
+		jwt.verify(token, "jwtSecret", (err, decode) => {
+			if (err) {
+				res.json({ auth: false, message: "U failed to authenticate" });
+			} else {
+				req.userId = decode.id;
+				next();
+			}
+		});
+	}
+};
+
+app.get("/isUserAuth", verifyJWT, (req, res) => {
+	res.send("You are authenticated...");
+});
+
 app.post("/login", (req, res) => {
 	const username = req.body.username;
 	const password = req.body.password;
@@ -82,19 +105,26 @@ app.post("/login", (req, res) => {
 			}
 
 			// send status
-			if (result.length > 0) {
+			if (result?.length > 0) {
 				bcrypt.compare(password, result[0].password, (error, response) => {
 					if (response) {
+						const id = result[0].id;
+						const token = jwt.sign({ id }, "jwtSecret", {
+							expiresIn: 300,
+						});
+
 						req.session.user = result;
 						console.log(req.session.user);
-						res.send(result);
+
+						// res.send(result);
+						res.json({ auth: true, token: token, result: result });
 					} else {
-						res.send({ message: "Wrong password!" });
+						res.json({ auth: false, message: "Wrong username/password!" });
 					}
 				});
 			} else {
 				// no result
-				res.send({ message: "User doesn't exist!" });
+				res.json({ auth: true, message: "no user exists..." });
 			}
 		}
 	);
